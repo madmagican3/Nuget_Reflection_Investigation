@@ -9,7 +9,7 @@ namespace NugetInvestigation
 {
     class Program
     {
-        public static string WorkingDir = "C:\\Users\\Bomie\\Desktop\\NugetWorkingDir";
+        public static string WorkingDir = "C:\\Users\\madma\\Desktop\\Nuget working dir";
 
         static int GetLastFileNo(string[] getLastFileNo)
         {
@@ -30,7 +30,6 @@ namespace NugetInvestigation
 
             //setup the folders required
             var resultFolder = $"{WorkingDir}\\Results";
-            var redoFolder = $"{WorkingDir}\\Redo";
             var stopFolder = $"{WorkingDir}\\insertFilesHereToStopAfterLatestRun";
 
             //delete the stop folder, as we dont know if it's used and we want it empty
@@ -45,17 +44,22 @@ namespace NugetInvestigation
             //create the working dirs if they're not working
             Directory.CreateDirectory(stopFolder);
             Directory.CreateDirectory(resultFolder);
-            Directory.CreateDirectory(redoFolder);
 
             //setup the start of the redo functionality
             Console.WriteLine($"Handling redos");
             var taskListRedo = new List<Task>();
-            foreach (var file in Directory.GetFiles(redoFolder))
+            var lastNum = int.Parse(Directory.GetFiles(resultFolder).Last().Replace(".json", ""));
+            var numbersToDo = new List<int>();
+            for (int i = 0; i < lastNum; i++)
             {
-                //get the file number
-                var fileName = file.Split('\\').Last().Replace(".json", "");
-                var id = int.Parse(fileName);
+                if (!Directory.GetFiles(resultFolder).Any(x => x == $"{i}.json"))
+                {
+                    numbersToDo.Add(i);
+                }
+            }
 
+            foreach (var id in numbersToDo)
+            {
                 //work out the archive details
                 var nugetArchiveFolder = $"{WorkingDir}\\Archive{id}";
                 var nugetDownloadFolder = $"{WorkingDir}\\Initial{id}";
@@ -79,30 +83,45 @@ namespace NugetInvestigation
 
                 //start the task of handling the catalog
                 var task = Task.Run(async () =>
-                    await nugetHandler.MainMethod(nugetDownloadFolder, nugetArchiveFolder, resultFolder, id,
-                        redoFolder));
-
+                    await nugetHandler.MainMethod(nugetDownloadFolder, nugetArchiveFolder, resultFolder, id));
                 //add it to the task list
-                //  taskListRedo.Add(task);
+                taskListRedo.Add(task);
+                if (taskListRedo.Count % 20 == 0)
+                {
+                    try
+                    {
+                        //wait for all the tasks to be done
+                        Task.WaitAll(taskListRedo.ToArray());
+
+                        //clear the task list
+                        taskListRedo.Clear();
+
+                        //if we've got a file in the stop folder then stop running the code
+                        if (Directory.GetFiles(stopFolder).Any())
+                        {
+                            break;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        //track the errors in a anon object
+                        Directory.CreateDirectory($"{WorkingDir}\\Errors");
+                        File.WriteAllText($"{WorkingDir}\\Errors\\Errors{id}.txt", JsonSerializer.Serialize(new
+                        {
+                            message = ex.Message,
+                            stacktrace = ex.StackTrace,
+                            innerStack = ex.InnerException
+                        }));
+
+                        //if we've got a file in the stop folder then stop running the code
+                        if (Directory.GetFiles(stopFolder).Any())
+                        {
+                            break;
+                        }
+                    }
+                }
             }
 
-            //wait until all the tasks for redo are done
-            try
-            {
-                Task.WaitAll(taskListRedo.ToArray());
-                Console.WriteLine($"Finished doing all the redos");
-            }
-            catch (Exception ex)
-            {
-                //track the errors in a anon object
-                Directory.CreateDirectory($"{WorkingDir}\\Errors");
-                File.WriteAllText($"{WorkingDir}\\Errors\\Errors{"redo"}.txt", JsonSerializer.Serialize(new
-                {
-                    message = ex.Message,
-                    stacktrace = ex.StackTrace,
-                    innerStack = ex.InnerException
-                }));
-            }
 
             var taskList = new List<Task>();
 
@@ -120,8 +139,7 @@ namespace NugetInvestigation
 
                 //start the task and it too the list
                 var task = Task.Run(async () =>
-                    await nugetHandler.MainMethod(nugetDownloadFolder, nugetArchiveFolder, resultFolder, id,
-                        redoFolder));
+                    await nugetHandler.MainMethod(nugetDownloadFolder, nugetArchiveFolder, resultFolder, id));
                 taskList.Add(task);
 
                 //we dont want to go over 20 working threads at a time so stop at 20

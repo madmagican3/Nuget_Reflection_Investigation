@@ -14,13 +14,10 @@ namespace NugetInvestigation
     public class NugetHandler
     {
         public async Task MainMethod(string nugetDownloadFolder, string nugetArchiveFolder, string resultFolder,
-            int i, string redoFolder)
+            int i)
         {
             //setup the default details
             var client = new HttpClient();
-
-            //add a redo element, we'll delete it at the end
-            File.Create($"{redoFolder}\\{i}.json");
 
             //create this threads working dirs
             Directory.CreateDirectory(nugetArchiveFolder);
@@ -92,7 +89,6 @@ namespace NugetInvestigation
             Directory.Delete(nugetArchiveFolder, true);
             Directory.Delete(nugetDownloadFolder, true);
             File.WriteAllText($"{resultFolder}\\{i}.json", JsonSerializer.Serialize(results));
-            File.Delete($"{redoFolder}\\{i}.json");
         }
 
         private async Task SaveZippedDllsTo(HttpResponseMessage getActualNuget, string nugetFilePath,
