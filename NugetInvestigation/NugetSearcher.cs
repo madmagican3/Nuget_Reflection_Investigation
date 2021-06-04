@@ -5,11 +5,11 @@ using Mono.Collections.Generic;
 
 namespace NugetInvestigation
 {
-    public class ReflectionInspectorGadget
+    public class NugetSearcher
     {
         private readonly string _assemblyPath;
 
-        public ReflectionInspectorGadget(string assemblyPath)
+        public NugetSearcher(string assemblyPath)
         {
             _assemblyPath = assemblyPath;
         }

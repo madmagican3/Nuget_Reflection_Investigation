@@ -23,6 +23,7 @@ namespace NugetInvestigation
             var resultFolder = $"{WorkingDir}\\Results";
             var stopFolder = $"{WorkingDir}\\insertFilesHereToStopAfterLatestRun";
             var catalogs = $"{WorkingDir}\\catalogs";
+            var errorFolder = $"{WorkingDir}\\Errors";
 
             //delete the stop folder, as we dont know if it's used and we want it empty
             try
@@ -37,6 +38,7 @@ namespace NugetInvestigation
             Directory.CreateDirectory(stopFolder);
             Directory.CreateDirectory(resultFolder);
             Directory.CreateDirectory(catalogs);
+            Directory.CreateDirectory(errorFolder);
 
             var hasHitEndOfCatalogs = false;
             var counter = 0;
@@ -88,7 +90,8 @@ namespace NugetInvestigation
 
                 //start the task and it too the list
                 var task = Task.Run(async () =>
-                    await nugetHandler.MainMethod(nugetDownloadFolder, nugetArchiveFolder, resultFolder, id));
+                    await nugetHandler.MainMethod(nugetDownloadFolder, nugetArchiveFolder, resultFolder, id,
+                        errorFolder));
                 taskList.Add(task);
 
                 //we dont want to go over 20 working threads at a time so stop at 20
@@ -111,12 +114,12 @@ namespace NugetInvestigation
                     catch (Exception ex)
                     {
                         //track the errors in a anon object
-                        Directory.CreateDirectory($"{WorkingDir}\\Errors");
-                        File.WriteAllText($"{WorkingDir}\\Errors\\Errors{id}.txt", JsonSerializer.Serialize(new
+                        File.WriteAllText($"{errorFolder}\\Errors{id}.txt", JsonSerializer.Serialize(new
                         {
                             message = ex.Message,
                             stacktrace = ex.StackTrace,
-                            innerStack = ex.InnerException
+                            innerStackMessage = ex.InnerException?.Message,
+                            innerStack = ex.InnerException?.StackTrace,
                         }));
 
                         //if we've got a file in the stop folder then stop running the code

@@ -14,7 +14,7 @@ namespace NugetInvestigation
     public class NugetHandler
     {
         public async Task MainMethod(string nugetDownloadFolder, string nugetArchiveFolder, string resultFolder,
-            int i)
+            int i, string errorFolder)
         {
             //setup the default details
             var client = new HttpClient();
@@ -47,9 +47,23 @@ namespace NugetInvestigation
                 var getActualNuget = await client.GetAsync(url);
                 if (!getActualNuget.IsSuccessStatusCode)
                 {
+                    continue;
                 }
 
-                await SaveZippedDllsTo(getActualNuget, nugetDownloadFolder, nuget.NugetVersion, nuget.NugetId);
+                try
+                {
+                    await SaveZippedDllsTo(getActualNuget, nugetDownloadFolder, nuget.NugetVersion, nuget.NugetId);
+                }
+                catch (Exception ex)
+                {
+                    File.WriteAllText($"{errorFolder}\\Errors{i}.txt", JsonSerializer.Serialize(new
+                    {
+                        message = ex.Message,
+                        stacktrace = ex.StackTrace,
+                        innerStackMessage = ex.InnerException?.Message,
+                        innerStack = ex.InnerException?.StackTrace,
+                    }));
+                }
 
                 Console.WriteLine($"Nuget elements have been downloaded");
             }
@@ -70,13 +84,20 @@ namespace NugetInvestigation
                 {
                     try
                     {
-                        var nugetSearcher = new ReflectionInspectorGadget(dll);
+                        var nugetSearcher = new NugetSearcher(dll);
                         var reflectionInstances = nugetSearcher.FindInstancesOfReflection();
                         reflectionInstances.ForEach(x => x.DllName = dll.Split('\\').Last().Replace(".dll", ""));
                         value.ReflectionInstances.Add(reflectionInstances);
                     }
                     catch (Exception ex)
                     {
+                        File.WriteAllText($"{errorFolder}\\Errors{i}.txt", JsonSerializer.Serialize(new
+                        {
+                            message = ex.Message,
+                            stacktrace = ex.StackTrace,
+                            innerStackMessage = ex.InnerException?.Message,
+                            innerStack = ex.InnerException?.StackTrace,
+                        }));
                     }
                 }
 
