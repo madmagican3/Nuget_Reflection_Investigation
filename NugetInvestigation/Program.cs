@@ -47,20 +47,34 @@ namespace NugetInvestigation
 
             if (!Directory.GetFiles(catalogs).Any())
             {
-                do
+                try
                 {
-                    var result = client.GetAsync($"https://api.nuget.org/v3/catalog0/page{counter}.json").Result;
-                    if (!result.IsSuccessStatusCode) //Once it hits a 404 we're done
+                    do
                     {
-                        hasHitEndOfCatalogs = true;
-                    }
+                        var result = client.GetAsync($"https://api.nuget.org/v3/catalog0/page{counter}.json").Result;
+                        if (!result.IsSuccessStatusCode) //Once it hits a 404 we're done
+                        {
+                            hasHitEndOfCatalogs = true;
+                        }
 
-                    var content = result.Content.ReadAsStringAsync().Result;
-                    var catalogPage = JsonConvert.DeserializeObject<CatalogPage>(content);
-                    File.WriteAllText($"{catalogs}\\{counter}.json", JsonSerializer.Serialize(catalogPage));
-                    Console.WriteLine($"Got catalog {counter} and continuing");
-                    counter += 1;
-                } while (!hasHitEndOfCatalogs);
+                        var content = result.Content.ReadAsStringAsync().Result;
+                        var catalogPage = JsonConvert.DeserializeObject<CatalogPage>(content);
+                        File.WriteAllText($"{catalogs}\\{counter}.json", JsonSerializer.Serialize(catalogPage));
+                        Console.WriteLine($"Got catalog {counter} and continuing");
+                        counter += 1;
+                    } while (!hasHitEndOfCatalogs);
+                }
+                catch (Exception ex)
+                {
+                    File.WriteAllText($"{errorFolder}\\Errors{catalogs}.txt", JsonSerializer.Serialize(new
+                    {
+                        message = ex.Message,
+                        stacktrace = ex.StackTrace,
+                        innerStackMessage = ex.InnerException?.Message,
+                        innerStack = ex.InnerException?.StackTrace,
+                        dllName = catalogs,
+                    }));
+                }
             }
 
             //get all the ints currently in the result list

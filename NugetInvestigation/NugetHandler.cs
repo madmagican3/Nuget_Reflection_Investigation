@@ -62,6 +62,8 @@ namespace NugetInvestigation
                         stacktrace = ex.StackTrace,
                         innerStackMessage = ex.InnerException?.Message,
                         innerStack = ex.InnerException?.StackTrace,
+                        nugetName = nuget.NugetId,
+                        nugetVersion = nuget.NugetVersion
                     }));
                 }
 
@@ -97,6 +99,9 @@ namespace NugetInvestigation
                             stacktrace = ex.StackTrace,
                             innerStackMessage = ex.InnerException?.Message,
                             innerStack = ex.InnerException?.StackTrace,
+                            dllName = dll,
+                            nugetName = nugetId,
+                            nugetVersion = nugetVersion
                         }));
                     }
                 }

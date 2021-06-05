@@ -31,6 +31,8 @@ namespace NugetInvestigation
 
         private IEnumerable<ReflectionInstance> ScanMethodsForReflection(Collection<MethodDefinition> classMethods)
         {
+            if (classMethods == null || !classMethods.Any())
+                return new List<ReflectionInstance>();
             var results = new List<ReflectionInstance>();
             foreach (var meth in classMethods)
             {
