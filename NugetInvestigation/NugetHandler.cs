@@ -16,80 +16,46 @@ namespace NugetInvestigation
         public async Task MainMethod(string nugetDownloadFolder, string nugetArchiveFolder, string resultFolder,
             int i, string errorFolder)
         {
-            //setup the default details
-            var client = new HttpClient();
-
-            //create this threads working dirs
-            Directory.CreateDirectory(nugetArchiveFolder);
-            Directory.CreateDirectory(nugetDownloadFolder);
-
-            //get the catalog 
             var results = new List<Results>();
-            int counter = 0;
-            var result = await client.GetAsync($"https://api.nuget.org/v3/catalog0/page{i}.json");
-            if (!result.IsSuccessStatusCode) //Once it hits a 404 we're done
+
+            try
             {
-                throw new Exception($"404 means done");
-            }
+                //setup the default details
+                var client = new HttpClient();
 
-            var content = await result.Content.ReadAsStringAsync();
-            var catalogPage = JsonConvert.DeserializeObject<CatalogPage>(content);
-            Console.WriteLine($"Got catalog page {i}");
+                //create this threads working dirs
+                Directory.CreateDirectory(nugetArchiveFolder);
+                Directory.CreateDirectory(nugetDownloadFolder);
 
-
-            //download each nuget from the catalog details
-            foreach (var nuget in catalogPage.items)
-            {
-                Console.WriteLine($"Got nuget {nuget.NugetId}");
-                var url =
-                    $"https://www.nuget.org/api/v2/package/{nuget.NugetId}/{nuget.NugetVersion}";
-
-                var getActualNuget = await client.GetAsync(url);
-                if (!getActualNuget.IsSuccessStatusCode)
+                //get the catalog 
+                int counter = 0;
+                var result = await client.GetAsync($"https://api.nuget.org/v3/catalog0/page{i}.json");
+                if (!result.IsSuccessStatusCode) //Once it hits a 404 we're done
                 {
-                    continue;
+                    throw new Exception($"404 means done");
                 }
 
-                try
+                var content = await result.Content.ReadAsStringAsync();
+                var catalogPage = JsonConvert.DeserializeObject<CatalogPage>(content);
+                Console.WriteLine($"Got catalog page {i}");
+
+
+                //download each nuget from the catalog details
+                foreach (var nuget in catalogPage.items)
                 {
-                    await SaveZippedDllsTo(getActualNuget, nugetDownloadFolder, nuget.NugetVersion, nuget.NugetId);
-                }
-                catch (Exception ex)
-                {
-                    File.WriteAllText($"{errorFolder}\\Errors{i}.txt", JsonSerializer.Serialize(new
+                    Console.WriteLine($"Got nuget {nuget.NugetId}");
+                    var url =
+                        $"https://www.nuget.org/api/v2/package/{nuget.NugetId}/{nuget.NugetVersion}";
+
+                    var getActualNuget = await client.GetAsync(url);
+                    if (!getActualNuget.IsSuccessStatusCode)
                     {
-                        message = ex.Message,
-                        stacktrace = ex.StackTrace,
-                        innerStackMessage = ex.InnerException?.Message,
-                        innerStack = ex.InnerException?.StackTrace,
-                        nugetName = nuget.NugetId,
-                        nugetVersion = nuget.NugetVersion
-                    }));
-                }
+                        continue;
+                    }
 
-                Console.WriteLine($"Nuget elements have been downloaded");
-            }
-
-            //foreach nuget extract it and inspect it for references to system.reflection
-            foreach (var folder in Directory.GetDirectories(nugetDownloadFolder))
-            {
-                var nugetId = folder.Split('\\').Last().Split('^').First();
-                var nugetVersion = folder.Split('\\').Last().Split('^').Last();
-                var value = new Results()
-                {
-                    NugetId = nugetId,
-                    ReflectionInstances = new List<List<ReflectionInstance>>(),
-                    NugetVersion = nugetVersion
-                };
-
-                foreach (var dll in Directory.GetFiles(folder))
-                {
                     try
                     {
-                        var nugetSearcher = new NugetSearcher(dll);
-                        var reflectionInstances = nugetSearcher.FindInstancesOfReflection();
-                        reflectionInstances.ForEach(x => x.DllName = dll.Split('\\').Last().Replace(".dll", ""));
-                        value.ReflectionInstances.Add(reflectionInstances);
+                        await SaveZippedDllsTo(getActualNuget, nugetDownloadFolder, nuget.NugetVersion, nuget.NugetId);
                     }
                     catch (Exception ex)
                     {
@@ -99,22 +65,65 @@ namespace NugetInvestigation
                             stacktrace = ex.StackTrace,
                             innerStackMessage = ex.InnerException?.Message,
                             innerStack = ex.InnerException?.StackTrace,
-                            dllName = dll,
-                            nugetName = nugetId,
-                            nugetVersion = nugetVersion
+                            nugetName = nuget.NugetId,
+                            nugetVersion = nuget.NugetVersion
                         }));
                     }
+
+                    Console.WriteLine($"Nuget elements have been downloaded");
                 }
 
-                results.Add(value);
+                //foreach nuget extract it and inspect it for references to system.reflection
+                foreach (var folder in Directory.GetDirectories(nugetDownloadFolder))
+                {
+                    var nugetId = folder.Split('\\').Last().Split('^').First();
+                    var nugetVersion = folder.Split('\\').Last().Split('^').Last();
+                    var value = new Results()
+                    {
+                        NugetId = nugetId,
+                        ReflectionInstances = new List<List<ReflectionInstance>>(),
+                        NugetVersion = nugetVersion
+                    };
+
+                    foreach (var dll in Directory.GetFiles(folder))
+                    {
+                        try
+                        {
+                            var nugetSearcher = new NugetSearcher(dll);
+                            var reflectionInstances = nugetSearcher.FindInstancesOfReflection();
+                            reflectionInstances.ForEach(x => x.DllName = dll.Split('\\').Last().Replace(".dll", ""));
+                            value.ReflectionInstances.Add(reflectionInstances);
+                        }
+                        catch (Exception ex)
+                        {
+                            File.WriteAllText($"{errorFolder}\\Errors{i}.txt", JsonSerializer.Serialize(new
+                            {
+                                message = ex.Message,
+                                stacktrace = ex.StackTrace,
+                                innerStackMessage = ex.InnerException?.Message,
+                                innerStack = ex.InnerException?.StackTrace,
+                                dllName = dll,
+                                nugetName = nugetId,
+                                nugetVersion = nugetVersion
+                            }));
+                        }
+                    }
+
+                    results.Add(value);
+                }
             }
+            catch (Exception ex)
+            {
+            }
+            finally
+            {
+                //cleanup elements
+                Console.WriteLine($"Finished catalog {i} and cleaning up");
 
-            //cleanup elements
-            Console.WriteLine($"Finished catalog {i} and cleaning up");
-
-            Directory.Delete(nugetArchiveFolder, true);
-            Directory.Delete(nugetDownloadFolder, true);
-            File.WriteAllText($"{resultFolder}\\{i}.json", JsonSerializer.Serialize(results));
+                Directory.Delete(nugetArchiveFolder, true);
+                Directory.Delete(nugetDownloadFolder, true);
+                File.WriteAllText($"{resultFolder}\\{i}.json", JsonSerializer.Serialize(results));
+            }
         }
 
         private async Task SaveZippedDllsTo(HttpResponseMessage getActualNuget, string nugetFilePath,

@@ -66,13 +66,13 @@ namespace NugetInvestigation
                 }
                 catch (Exception ex)
                 {
-                    File.WriteAllText($"{errorFolder}\\Errors{catalogs}.txt", JsonSerializer.Serialize(new
+                    File.WriteAllText($"{errorFolder}\\ErrorsCatalog{counter}.txt", JsonSerializer.Serialize(new
                     {
                         message = ex.Message,
                         stacktrace = ex.StackTrace,
                         innerStackMessage = ex.InnerException?.Message,
                         innerStack = ex.InnerException?.StackTrace,
-                        dllName = catalogs,
+                        catalogNum = catalogs,
                     }));
                 }
             }
