@@ -16,12 +16,13 @@ namespace NugetInvestigation
         public async Task MainMethod(string nugetDownloadFolder, string nugetArchiveFolder, string resultFolder,
             int i, string errorFolder)
         {
-            var results = new List<Results>();
-
             try
             {
                 //setup the default details
-                var client = new HttpClient();
+                var client = new HttpClient()
+                {
+                    Timeout = TimeSpan.FromMinutes(5)
+                };
 
                 //create this threads working dirs
                 Directory.CreateDirectory(nugetArchiveFolder);
@@ -39,22 +40,25 @@ namespace NugetInvestigation
                 var catalogPage = JsonConvert.DeserializeObject<CatalogPage>(content);
                 Console.WriteLine($"Got catalog page {i}");
 
+                var results = new List<Results>();
 
                 //download each nuget from the catalog details
                 foreach (var nuget in catalogPage.items)
                 {
                     Console.WriteLine($"Got nuget {nuget.NugetId}");
-                    var url =
-                        $"https://www.nuget.org/api/v2/package/{nuget.NugetId}/{nuget.NugetVersion}";
 
-                    var getActualNuget = await client.GetAsync(url);
-                    if (!getActualNuget.IsSuccessStatusCode)
-                    {
-                        continue;
-                    }
 
                     try
                     {
+                        var url =
+                            $"https://www.nuget.org/api/v2/package/{nuget.NugetId}/{nuget.NugetVersion}";
+
+                        var getActualNuget = await client.GetAsync(url);
+                        if (!getActualNuget.IsSuccessStatusCode)
+                        {
+                            continue;
+                        }
+
                         await SaveZippedDllsTo(getActualNuget, nugetDownloadFolder, nuget.NugetVersion, nuget.NugetId);
                     }
                     catch (Exception ex)
@@ -111,9 +115,18 @@ namespace NugetInvestigation
 
                     results.Add(value);
                 }
+
+                File.WriteAllText($"{resultFolder}\\{i}.json", JsonSerializer.Serialize(results));
             }
             catch (Exception ex)
             {
+                File.WriteAllText($"{errorFolder}\\Errors{i}.txt", JsonSerializer.Serialize(new
+                {
+                    message = ex.Message,
+                    stacktrace = ex.StackTrace,
+                    innerStackMessage = ex.InnerException?.Message,
+                    innerStack = ex.InnerException?.StackTrace,
+                }));
             }
             finally
             {
@@ -122,7 +135,6 @@ namespace NugetInvestigation
 
                 Directory.Delete(nugetArchiveFolder, true);
                 Directory.Delete(nugetDownloadFolder, true);
-                File.WriteAllText($"{resultFolder}\\{i}.json", JsonSerializer.Serialize(results));
             }
         }
 

@@ -113,15 +113,13 @@ namespace NugetInvestigation
                 {
                     try
                     {
-                        //wait for all the tasks to be done
-                        Task.WaitAll(taskList.ToArray());
-
-                        //clear the task list
-                        taskList.Clear();
+                        var finishedTask = Task.WhenAny(taskList).Result;
+                        taskList.Remove(finishedTask);
 
                         //if we've got a file in the stop folder then stop running the code
                         if (Directory.GetFiles(stopFolder).Any())
                         {
+                            Task.WaitAll();
                             break;
                         }
                     }
@@ -144,6 +142,8 @@ namespace NugetInvestigation
                     }
                 }
             }
+
+            Task.WaitAll();
 
             Console.WriteLine("Stopped");
 
